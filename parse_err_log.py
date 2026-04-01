@@ -2,13 +2,18 @@
 import re, csv, sys
 from pathlib import Path
 
-log_path = Path('err.log')
-out_path = Path('timings.csv')
+if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
+    print(f"Usage: {sys.argv[0]} <err.log> [output.csv]", file=sys.stderr)
+    print("  Parses a hifiasm error log and writes per-function timing intervals to CSV.", file=sys.stderr)
+    sys.exit(0 if len(sys.argv) > 1 else 1)
+
+log_path = Path(sys.argv[1])
+out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else log_path.with_suffix('.timings.csv')
 
 pat = re.compile(r"\[M::([^\]:]+)::([0-9.]+)(?:\*([0-9.]+))?(?:@([0-9.]+)GB)?\]")
 
 if not log_path.exists():
-    print('err.log not found', file=sys.stderr)
+    print(f'{log_path} not found', file=sys.stderr)
     sys.exit(1)
 
 entries = []
@@ -23,17 +28,14 @@ with log_path.open() as f:
             cores = float(cores) if cores else None
             entries.append({'func': func, 'ts': ts, 'cores': cores})
 
-# compute intervals preserving log order (no categorization)
 rows = []
 prev = None
 for e in entries:
-    # entries are already in log order; no sorting
     if e['func'] == 'pec':
         continue
     if prev is None:
         prev = e
         continue
-    # ensure prev is not pec
     if prev['func'] == 'pec':
         prev = e
         continue
